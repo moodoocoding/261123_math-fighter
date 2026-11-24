@@ -1,0 +1,1307 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>수학격투 - 초등 곱셈 액션 배틀</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Jua&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Jua', sans-serif;
+        }
+        .title-font {
+            font-family: 'Black Han Sans', sans-serif;
+            letter-spacing: 1px;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .action-btn {
+            transition: transform 0.08s ease, filter 0.1s ease;
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.55);
+        }
+        .action-btn:active:not(:disabled) {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.55);
+        }
+        .action-btn:disabled {
+            opacity: 0.45;
+            filter: grayscale(75%);
+            cursor: not-allowed;
+        }
+        @keyframes pulseAura {
+            0%, 100% { transform: scale(1); filter: brightness(1); }
+            50% { transform: scale(1.06); filter: brightness(1.25); }
+        }
+        .charge-active {
+            animation: pulseAura 0.4s infinite;
+        }
+        .hud-skew-left {
+            transform: skewX(-14deg);
+        }
+        .hud-skew-right {
+            transform: skewX(14deg);
+        }
+    </style>
+</head>
+<body class="w-screen h-screen relative overflow-hidden bg-slate-950 text-white">
+
+    <!-- ==================== 1. 메인 타이틀 화면 ==================== -->
+    <div id="screen-title" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-950 p-4 pt-10">
+        <div class="text-center mb-6">
+            <div class="inline-block px-4 py-1 mb-2 rounded-full bg-amber-500/20 border border-amber-400 text-amber-300 text-sm sm:text-base">
+                ⚡ 구구단 초능력 격투 게임 ⚡
+            </div>
+            <h1 class="title-font text-6xl sm:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-amber-400 to-orange-600 drop-shadow-[0_6px_0_rgba(0,0,0,0.9)]">
+                수학격투
+            </h1>
+            <p class="text-cyan-300 text-base sm:text-xl mt-2">곱셈 문제를 풀고 필살기로 상대를 쓰러뜨려라!</p>
+        </div>
+
+        <!-- 모드 선택 버튼 -->
+        <div class="flex flex-col sm:flex-row gap-4 w-full max-w-md mb-6">
+            <button onclick="selectMode('1P')" class="action-btn flex-1 py-4 px-6 rounded-2xl bg-gradient-to-b from-amber-400 to-orange-600 border-2 border-yellow-200 text-slate-950 text-2xl sm:text-3xl font-bold flex flex-col items-center">
+                <span>🥋 1인용 모드</span>
+                <span class="text-xs sm:text-sm font-normal text-slate-900 mt-1">월드 스테이지 정복 (별 모으기)</span>
+            </button>
+            <button onclick="selectMode('2P')" class="action-btn flex-1 py-4 px-6 rounded-2xl bg-gradient-to-b from-cyan-400 to-blue-600 border-2 border-cyan-100 text-slate-950 text-2xl sm:text-3xl font-bold flex flex-col items-center">
+                <span>⚔️ 2인용 모드</span>
+                <span class="text-xs sm:text-sm font-normal text-slate-900 mt-1">친구와 번갈아 곱셈 대결!</span>
+            </button>
+        </div>
+
+        <!-- 간단한 게임 규칙 안내 카드 -->
+        <div class="w-full max-w-xl bg-slate-900/85 border border-slate-700 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+            <div class="bg-slate-800/80 p-2 rounded-xl">
+                <div class="text-yellow-400 font-bold">👊 일반공격</div>
+                <div>문제 1개 → 10% 피해</div>
+            </div>
+            <div class="bg-slate-800/80 p-2 rounded-xl">
+                <div class="text-sky-400 font-bold">⚡ 특수스킬</div>
+                <div>문제 2개 → 30% 피해</div>
+            </div>
+            <div class="bg-slate-800/80 p-2 rounded-xl">
+                <div class="text-rose-400 font-bold">🔥 필살기</div>
+                <div>문제 3개 → 50% 피해</div>
+            </div>
+            <div class="bg-slate-800/80 p-2 rounded-xl">
+                <div class="text-emerald-400 font-bold">🔋 Z 버튼</div>
+                <div>기 모으기 (마나 충전)</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 2. 스테이지 선택 화면 (1인용: 맵당 10스테이지) ==================== -->
+    <div id="screen-stage" class="hidden fixed inset-0 z-40 flex flex-col items-center justify-start bg-gradient-to-b from-slate-900 via-slate-800 to-slate-950 p-4 pt-12 pb-12 overflow-y-auto">
+        <div class="w-full max-w-4xl">
+            <div class="flex items-center justify-between mb-4">
+                <button onclick="goToTitle()" class="action-btn px-4 py-2 rounded-xl bg-slate-700 border border-slate-500 text-white text-sm sm:text-base">
+                    ⬅ 처음으로
+                </button>
+                <h2 class="title-font text-3xl sm:text-5xl text-amber-400 drop-shadow">월드 & 스테이지</h2>
+                <div class="w-20"></div>
+            </div>
+
+            <!-- 맵(월드) 선택 탭 (맵 1 ~ 맵 6) -->
+            <div id="map-tabs" class="grid grid-cols-3 sm:grid-cols-6 gap-2 mb-5"></div>
+
+            <!-- 현재 선택된 맵 정보 배너 -->
+            <div id="current-map-info" class="mb-4 p-4 rounded-2xl bg-slate-800/90 border-2 border-amber-500/60 flex flex-col sm:flex-row items-center justify-between gap-2"></div>
+
+            <!-- 선택된 맵의 10개 스테이지 그리드 (1 ~ 10 스테이지) -->
+            <div id="stage-grid" class="grid grid-cols-2 sm:grid-cols-5 gap-3 pb-6"></div>
+        </div>
+    </div>
+
+    <!-- ==================== 3. 배틀 게임 화면 ==================== -->
+    <div id="screen-battle" class="hidden relative w-full h-full">
+        <!-- 배경 및 스틱맨 격투 캔버스 -->
+        <canvas id="battle-canvas"></canvas>
+
+        <!-- 상단 HUD (체력바, 마나바, 스테이지/턴 정보) -->
+        <div class="absolute top-0 left-0 right-0 pt-8 sm:pt-10 px-3 sm:px-6 flex items-start justify-between gap-2 pointer-events-none">
+            <!-- Player 1 (왼쪽) -->
+            <div class="flex-1 max-w-[42%]">
+                <div class="flex items-center gap-2 mb-1">
+                    <div class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-amber-500 border-2 border-yellow-200 flex items-center justify-center text-xl shadow">🥋</div>
+                    <div>
+                        <div id="p1-name" class="text-sm sm:text-lg font-bold text-yellow-300 leading-none">나 (1P)</div>
+                        <div id="p1-hp-text" class="text-xs sm:text-sm text-white">100 / 100</div>
+                    </div>
+                </div>
+                <!-- P1 체력바 -->
+                <div class="w-full h-4 sm:h-5 bg-slate-900/90 border-2 border-amber-400 rounded-md overflow-hidden hud-skew-left p-0.5">
+                    <div id="p1-hp-bar" class="h-full bg-gradient-to-r from-amber-500 to-yellow-300 transition-all duration-300" style="width: 100%;"></div>
+                </div>
+                <!-- P1 마나바 -->
+                <div class="w-4/5 h-2.5 sm:h-3 bg-slate-900/90 border border-cyan-400 rounded-md overflow-hidden hud-skew-left mt-1 p-0.5">
+                    <div id="p1-mp-bar" class="h-full bg-gradient-to-r from-blue-600 to-cyan-300 transition-all duration-150" style="width: 30%;"></div>
+                </div>
+                <div id="p1-mp-text" class="text-[11px] sm:text-xs text-cyan-300 mt-0.5">마나: 30 / 100</div>
+            </div>
+
+            <!-- 중앙 스테이지 & 턴 표시 -->
+            <div class="flex flex-col items-center pointer-events-auto">
+                <div id="battle-stage-badge" class="px-3 py-1 rounded-xl bg-slate-900/90 border-2 border-amber-400 text-amber-300 text-xs sm:text-base font-bold shadow">
+                    STAGE 1-1
+                </div>
+                <div id="turn-indicator" class="mt-1 px-3 py-0.5 rounded-full bg-emerald-500 text-slate-950 text-xs sm:text-sm font-bold shadow">
+                    1P 공격 차례!
+                </div>
+                <button onclick="quitBattle()" class="mt-1.5 px-2.5 py-0.5 rounded-lg bg-slate-800/80 border border-slate-600 text-[11px] text-slate-300 hover:bg-slate-700">
+                    나가기
+                </button>
+            </div>
+
+            <!-- Player 2 / Enemy (오른쪽) -->
+            <div class="flex-1 max-w-[42%] flex flex-col items-end">
+                <div class="flex items-center gap-2 mb-1 flex-row-reverse">
+                    <div id="p2-avatar" class="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-rose-600 border-2 border-rose-200 flex items-center justify-center text-xl shadow">👾</div>
+                    <div class="text-right">
+                        <div id="p2-name" class="text-sm sm:text-lg font-bold text-rose-300 leading-none">슬라임</div>
+                        <div id="p2-hp-text" class="text-xs sm:text-sm text-white">100 / 100</div>
+                    </div>
+                </div>
+                <!-- P2 체력바 -->
+                <div class="w-full h-4 sm:h-5 bg-slate-900/90 border-2 border-rose-400 rounded-md overflow-hidden hud-skew-right p-0.5">
+                    <div id="p2-hp-bar" class="h-full bg-gradient-to-l from-rose-600 to-pink-400 transition-all duration-300 ml-auto" style="width: 100%;"></div>
+                </div>
+                <!-- P2 마나바 -->
+                <div class="w-4/5 h-2.5 sm:h-3 bg-slate-900/90 border border-cyan-400 rounded-md overflow-hidden hud-skew-right mt-1 p-0.5">
+                    <div id="p2-mp-bar" class="h-full bg-gradient-to-l from-blue-600 to-cyan-300 transition-all duration-150 ml-auto" style="width: 30%;"></div>
+                </div>
+                <div id="p2-mp-text" class="text-[11px] sm:text-xs text-cyan-300 mt-0.5">마나: 30 / 100</div>
+            </div>
+        </div>
+
+        <!-- 중앙 알림 배너 -->
+        <div id="battle-banner" class="hidden absolute top-32 sm:top-36 left-1/2 -translate-x-1/2 z-20 px-6 py-2.5 rounded-2xl bg-slate-900/95 border-2 border-yellow-400 text-yellow-300 text-lg sm:text-2xl font-bold shadow-2xl text-center pointer-events-none whitespace-nowrap">
+            메시지
+        </div>
+
+        <!-- 하단 컨트롤러 (왼쪽: 가상 조이스틱 / 오른쪽: Z 기모으기 & 스킬 버튼) -->
+        <div class="absolute bottom-3 left-3 right-3 sm:bottom-5 sm:left-6 sm:right-6 flex items-end justify-between pointer-events-none">
+            <!-- 왼쪽: 가상 조이스틱 -->
+            <div class="pointer-events-auto flex flex-col items-center">
+                <div id="joystick-zone" class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full bg-slate-900/65 border-2 border-slate-500/80 backdrop-blur-sm flex items-center justify-center shadow-inner">
+                    <span class="absolute left-2 text-slate-400 text-xs">◀</span>
+                    <span class="absolute right-2 text-slate-400 text-xs">▶</span>
+                    <div id="joystick-knob" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-b from-amber-300 to-amber-600 border-2 border-yellow-100 shadow-lg flex items-center justify-center text-slate-900 font-bold text-xs">
+                        이동
+                    </div>
+                </div>
+                <span class="text-[11px] text-slate-300 mt-1 bg-slate-900/70 px-2 py-0.5 rounded-full">조이스틱 / ◀▶키</span>
+            </div>
+
+            <!-- 오른쪽: Z(마나 충전) & 공격/특수스킬/필살기 버튼 -->
+            <div class="pointer-events-auto flex flex-col items-end gap-2">
+                <!-- Z 버튼 (누르고 있거나 클릭 시 마나 충전) -->
+                <button id="btn-charge"
+                    onmousedown="startCharging()" onmouseup="stopCharging()" onmouseleave="stopCharging()"
+                    ontouchstart="startCharging(event)" ontouchend="stopCharging(event)"
+                    class="action-btn px-4 py-2 sm:px-5 sm:py-2.5 rounded-2xl bg-gradient-to-b from-emerald-400 to-teal-600 border-2 border-emerald-100 text-slate-950 font-bold text-sm sm:text-lg flex items-center gap-1.5">
+                    <span class="px-2 py-0.5 rounded bg-slate-950 text-emerald-300 text-xs sm:text-sm">Z</span>
+                    <span>기 모으기 (마나+)</span>
+                </button>
+
+                <!-- 3가지 공격 버튼 -->
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <!-- 일반공격 (문제 1개, 데미지 10%, 마나 0) -->
+                    <button id="btn-normal" onclick="openMathQuiz('normal')"
+                        class="action-btn w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-b from-amber-300 to-amber-600 border-2 border-yellow-100 text-slate-950 flex flex-col items-center justify-center p-1">
+                        <span class="text-xl sm:text-2xl">👊</span>
+                        <span class="text-xs sm:text-sm font-bold leading-tight">일반공격</span>
+                        <span class="text-[10px] sm:text-xs bg-slate-900/80 text-yellow-300 px-1.5 rounded mt-0.5">1문제·10%</span>
+                    </button>
+
+                    <!-- 특수스킬 (문제 2개, 데미지 30%, 마나 40) -->
+                    <button id="btn-special" onclick="openMathQuiz('special')"
+                        class="action-btn w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-b from-sky-300 to-blue-600 border-2 border-sky-100 text-slate-950 flex flex-col items-center justify-center p-1">
+                        <span class="text-xl sm:text-2xl">⚡</span>
+                        <span class="text-xs sm:text-sm font-bold leading-tight">특수스킬</span>
+                        <span class="text-[10px] sm:text-xs bg-slate-900/80 text-cyan-300 px-1.5 rounded mt-0.5">2문제·MP40</span>
+                    </button>
+
+                    <!-- 필살기 (문제 3개, 데미지 50%, 마나 80) -->
+                    <button id="btn-ultimate" onclick="openMathQuiz('ultimate')"
+                        class="action-btn w-22 h-22 sm:w-26 sm:h-26 px-2 rounded-2xl bg-gradient-to-b from-rose-400 via-red-500 to-purple-700 border-2 border-yellow-200 text-white flex flex-col items-center justify-center p-1">
+                        <span class="text-2xl sm:text-3xl">🔥</span>
+                        <span class="text-xs sm:text-base font-bold leading-tight text-yellow-200">필살기</span>
+                        <span class="text-[10px] sm:text-xs bg-slate-950/85 text-rose-300 px-1.5 rounded mt-0.5">3문제·MP80</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 4. 곱셈 문제 퀴즈 모달 ==================== -->
+    <div id="modal-quiz" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-gradient-to-b from-slate-800 to-slate-900 border-4 border-amber-400 rounded-3xl p-5 sm:p-6 shadow-2xl text-center">
+            <div class="flex items-center justify-between mb-3">
+                <span id="quiz-skill-badge" class="px-3 py-1 rounded-full bg-amber-500 text-slate-950 text-sm font-bold">
+                    👊 일반공격 (데미지 10%)
+                </span>
+                <span id="quiz-progress-badge" class="px-3 py-1 rounded-full bg-slate-700 text-cyan-300 text-sm font-bold">
+                    문제 1 / 1
+                </span>
+            </div>
+
+            <p class="text-slate-300 text-sm mb-2">정답을 맞히면 공격 성공! 틀리면 반격(20% 피해)!</p>
+
+            <!-- 곱셈 문제 표시 -->
+            <div class="my-4 py-5 px-4 rounded-2xl bg-slate-950 border-2 border-slate-700">
+                <div id="quiz-question" class="title-font text-5xl sm:text-6xl text-yellow-300 tracking-wider">
+                    3 × 4 = ?
+                </div>
+            </div>
+
+            <!-- 4지선다 보기 버튼 (초등학생이 빠르고 정확하게 누를 수 있도록) -->
+            <div id="quiz-options" class="grid grid-cols-2 gap-3 mt-4">
+                <!-- 자바스크립트로 4개 보기 생성 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== 5. 승리 / 패배 결과 모달 ==================== -->
+    <div id="modal-result" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="w-full max-w-md bg-gradient-to-b from-indigo-900 via-slate-900 to-slate-950 border-4 border-yellow-400 rounded-3xl p-6 sm:p-8 shadow-2xl text-center">
+            <h2 id="result-title" class="title-font text-4xl sm:text-5xl text-yellow-300 drop-shadow mb-2">
+                축하합니다!
+            </h2>
+            <p id="result-subtitle" class="text-cyan-200 text-base sm:text-lg mb-4">
+                스테이지를 클리어했습니다!
+            </p>
+
+            <!-- 별 1~3개 표시 영역 -->
+            <div id="result-stars" class="flex items-center justify-center gap-3 my-4 text-5xl sm:text-6xl">
+                <span>⭐</span><span>⭐</span><span>⭐</span>
+            </div>
+
+            <!-- 틀린 문제 수 & 평가 안내 -->
+            <div id="result-stats" class="bg-slate-800/90 border border-slate-600 rounded-2xl p-3 mb-6 text-sm sm:text-base text-slate-200">
+                틀린 문제: 0개 (완벽해요! 별 3개!)
+            </div>
+
+            <button onclick="finishBattleToStage()" class="action-btn w-full py-4 rounded-2xl bg-gradient-to-b from-amber-400 to-orange-600 border-2 border-yellow-200 text-slate-950 text-xl sm:text-2xl font-bold">
+                스테이지 창으로 돌아가기
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 효과음 시스템 (Tone.js) ====================
+        const SoundFX = {
+            initialized: false,
+            synth: null,
+            init() {
+                if (this.initialized) return;
+                try {
+                    if (window.Tone) {
+                        Tone.start();
+                        this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                        this.synth.volume.value = -8;
+                    }
+                    this.initialized = true;
+                } catch (e) {
+                    // 오디오 초기화 실패 시 무시하고 게임 계속 진행
+                }
+            },
+            playCharge() {
+                this.init();
+                if (!this.synth) return;
+                try {
+                    this.synth.triggerAttackRelease("C4", "16n");
+                } catch (e) {}
+            },
+            playCorrect() {
+                this.init();
+                if (!this.synth) return;
+                try {
+                    this.synth.triggerAttackRelease(["C5", "E5", "G5"], "8n");
+                } catch (e) {}
+            },
+            playWrong() {
+                this.init();
+                if (!this.synth) return;
+                try {
+                    this.synth.triggerAttackRelease(["F3", "B2"], "4n");
+                } catch (e) {}
+            },
+            playHit(power) {
+                this.init();
+                if (!this.synth) return;
+                try {
+                    if (power >= 50) {
+                        this.synth.triggerAttackRelease(["C3", "G3", "C4", "E4"], "4n");
+                    } else if (power >= 30) {
+                        this.synth.triggerAttackRelease(["E3", "B3", "E4"], "8n");
+                    } else {
+                        this.synth.triggerAttackRelease(["G3", "D4"], "16n");
+                    }
+                } catch (e) {}
+            },
+            playWin() {
+                this.init();
+                if (!this.synth) return;
+                try {
+                    const now = Tone.now();
+                    this.synth.triggerAttackRelease("C5", "8n", now);
+                    this.synth.triggerAttackRelease("E5", "8n", now + 0.12);
+                    this.synth.triggerAttackRelease("G5", "8n", now + 0.24);
+                    this.synth.triggerAttackRelease("C6", "4n", now + 0.36);
+                } catch (e) {}
+            }
+        };
+
+        // ==================== 월드(맵) 6개 × 각 10스테이지 = 총 60스테이지 데이터 ====================
+        const WORLDS = [
+            {
+                id: 1, name: "맵 1: 초원 도장", tables: [2, 3], multiplyType: 'basic', bgTop: "#1e3a8a", bgBottom: "#14532d", avatar: "🌱",
+                enemies: [
+                    { name: "초록 슬라임", avatar: "🟢" }, { name: "아기 다람쥐", avatar: "🐿️" },
+                    { name: "새싹 수련생", avatar: "🌱" }, { name: "숲속 개구리", avatar: "🐸" },
+                    { name: "나무 목각인형", avatar: "🪵" }, { name: "돌멩이 꼬마", avatar: "🪨" },
+                    { name: "바람 토끼", avatar: "🐇" }, { name: "도토리 사범", avatar: "🌰" },
+                    { name: "초원 수호기사", avatar: "🛡️" }, { name: "초원 대장 킹슬라임", avatar: "👑" }
+                ]
+            },
+            {
+                id: 2, name: "맵 2: 사막 유적", tables: [4, 5], multiplyType: 'basic', bgTop: "#7c2d12", bgBottom: "#b45309", avatar: "🏜️",
+                enemies: [
+                    { name: "모래 전갈", avatar: "🦂" }, { name: "선인장 전사", avatar: "🌵" },
+                    { name: "사막 여우", avatar: "🦊" }, { name: "미라 수련생", avatar: "🤕" },
+                    { name: "황금 풍뎅이", avatar: "🪲" }, { name: "모래폭풍 정령", avatar: "🌪️" },
+                    { name: "피라미드 문지기", avatar: "🗿" }, { name: "낙타 무술가", avatar: "🐪" },
+                    { name: "스핑크스 현자", avatar: "🦁" }, { name: "사막의 왕 파라오", avatar: "👑" }
+                ]
+            },
+            {
+                id: 3, name: "맵 3: 얼음 왕국", tables: [6, 7], multiplyType: 'basic', bgTop: "#0f172a", bgBottom: "#0369a1", avatar: "❄️",
+                enemies: [
+                    { name: "꼬마 눈사람", avatar: "⛄" }, { name: "얼음 펭귄", avatar: "🐧" },
+                    { name: "눈꽃 요정", avatar: "❄️" }, { name: "북극곰 수련생", avatar: "🐻‍❄️" },
+                    { name: "서리 늑대", avatar: "🐺" }, { name: "빙하 골렘", avatar: "🧊" },
+                    { name: "눈보라 마법사", avatar: "🧙" }, { name: "얼음 기사단장", avatar: "⚔️" },
+                    { name: "서리 드래곤", avatar: "🐉" }, { name: "얼음 여왕", avatar: "👑" }
+                ]
+            },
+            {
+                id: 4, name: "맵 4: 용암 화산", tables: [8, 9], multiplyType: 'double-single', bgTop: "#450a0a", bgBottom: "#9a3412", avatar: "🌋",
+                enemies: [
+                    { name: "불꽃 도롱뇽", avatar: "🦎" }, { name: "용암 박쥐", avatar: "🦇" },
+                    { name: "화염 슬라임", avatar: "🔥" }, { name: "불타는 해골", avatar: "💀" },
+                    { name: "마그마 바위", avatar: "🌋" }, { name: "화산 대장장이", avatar: "🔨" },
+                    { name: "불사조 피닉스", avatar: "🦅" }, { name: "화염 기갑병", avatar: "🤖" },
+                    { name: "용암 수호신", avatar: "👹" }, { name: "화산 마왕", avatar: "👑" }
+                ]
+            },
+            {
+                id: 5, name: "맵 5: 천공 신전", tables: [2, 3, 4, 5, 6], multiplyType: 'double-single', bgTop: "#312e81", bgBottom: "#4338ca", avatar: "⛅",
+                enemies: [
+                    { name: "구름 솜사탕", avatar: "☁️" }, { name: "날개 천사병", avatar: "👼" },
+                    { name: "번개 매", avatar: "⚡" }, { name: "무지개 유니콘", avatar: "🦄" },
+                    { name: "천공의 검사", avatar: "🗡️" }, { name: "태양빛 정령", avatar: "☀️" },
+                    { name: "달빛 암살자", avatar: "🌙" }, { name: "별빛 대마법사", avatar: "🔮" },
+                    { name: "천둥의 신", avatar: "⛈️" }, { name: "천공제왕 제우스", avatar: "👑" }
+                ]
+            },
+            {
+                id: 6, name: "맵 6: 우주의 끝", tables: [2, 3, 4, 5, 6, 7, 8, 9], multiplyType: 'double-double', bgTop: "#090d16", bgBottom: "#3b0764", avatar: "🌌",
+                enemies: [
+                    { name: "외계인 정찰병", avatar: "👽" }, { name: "우주 비행사", avatar: "👨‍🚀" },
+                    { name: "유성우 거인", avatar: "☄️" }, { name: "토성 고리전사", avatar: "🪐" },
+                    { name: "사이보그 X", avatar: "🦾" }, { name: "은하수 수호자", avatar: "🌌" },
+                    { name: "블랙홀 마신", avatar: "🕳️" }, { name: "초신성 드래곤", avatar: "🐲" },
+                    { name: "우주 챔피언", avatar: "🏆" }, { name: "수학의 신", avatar: "👑" }
+                ]
+            }
+        ];
+
+        const STAGES = [];
+        WORLDS.forEach(world => {
+            world.enemies.forEach((enemyObj, idx) => {
+                const stageNum = idx + 1;
+                STAGES.push({
+                    id: `${world.id}-${stageNum}`,
+                    worldId: world.id,
+                    stageNum: stageNum,
+                    name: `${world.id}-${stageNum} 스테이지`,
+                    enemy: enemyObj.name,
+                    avatar: enemyObj.avatar,
+                    tables: world.tables,
+                    multiplyType: world.multiplyType,
+                    bgTop: world.bgTop,
+                    bgBottom: world.bgBottom,
+                    isBoss: stageNum === 10,
+                    stars: 0
+                });
+            });
+        });
+
+        let selectedWorldId = 1;
+
+        // ==================== 게임 상태 변수 ====================
+        const gameState = {
+            mode: '1P', // '1P' or '2P'
+            currentStage: STAGES[0],
+            turn: 1, // 1: P1(나) 차례, 2: P2(적/2P) 차례
+            active: false,
+            isCharging: false,
+            wrongCountP1: 0,
+            wrongCountP2: 0,
+            p1: { x: 0.28, vx: 0, hp: 100, mp: 30, color: '#f97316', hairColor: '#e2e8f0', anim: 'idle', animTimer: 0, facing: 1 },
+            p2: { x: 0.72, vx: 0, hp: 100, mp: 30, color: '#ec4899', hairColor: '#fde047', anim: 'idle', animTimer: 0, facing: -1 },
+            projectiles: [],
+            particles: [],
+            shakeTimer: 0
+        };
+
+        // 퀴즈 진행 상태
+        const quizState = {
+            skillType: 'normal',
+            totalQuestions: 1,
+            currentIndex: 0,
+            damage: 10,
+            mpCost: 0,
+            currentAnswer: 0
+        };
+
+        // ==================== 화면 전환 및 스테이지 렌더링 ====================
+        function showScreen(screenId) {
+            ['screen-title', 'screen-stage', 'screen-battle'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        }
+
+        function goToTitle() {
+            gameState.active = false;
+            showScreen('screen-title');
+        }
+
+        function selectMode(mode) {
+            SoundFX.init();
+            gameState.mode = mode;
+            if (mode === '1P') {
+                if (!selectedWorldId || selectedWorldId < 1 || selectedWorldId > WORLDS.length) {
+                    selectedWorldId = 1;
+                }
+                showScreen('screen-stage');
+                renderStageSelect();
+            } else {
+                // 2인용 모드는 바로 대전 시작
+                startBattle(STAGES[STAGES.length - 1], true);
+            }
+        }
+
+        function renderStageSelect() {
+            const tabsContainer = document.getElementById('map-tabs');
+            const infoContainer = document.getElementById('current-map-info');
+            const grid = document.getElementById('stage-grid');
+            if (!tabsContainer || !infoContainer || !grid) return;
+
+            // 1) 상단 맵(월드) 탭 렌더링 (맵 1 ~ 맵 6)
+            tabsContainer.innerHTML = '';
+            WORLDS.forEach(world => {
+                const worldStages = STAGES.filter(s => s.worldId === world.id);
+                const totalStars = worldStages.reduce((sum, s) => sum + s.stars, 0);
+                const isSelected = (world.id === selectedWorldId);
+
+                const tabBtn = document.createElement('button');
+                tabBtn.type = 'button';
+                tabBtn.className = `action-btn py-2.5 px-2 rounded-xl border-2 text-xs sm:text-sm font-bold flex flex-col items-center justify-center transition-all ${
+                    isSelected
+                        ? 'bg-gradient-to-b from-amber-400 to-orange-500 border-yellow-200 text-slate-950 scale-105'
+                        : 'bg-slate-800 border-slate-600 text-slate-300 hover:border-amber-400'
+                }`;
+                tabBtn.onclick = () => {
+                    selectedWorldId = world.id;
+                    renderStageSelect();
+                };
+                tabBtn.innerHTML = `
+                    <span>${world.avatar} 맵 ${world.id}</span>
+                    <span class="text-[11px] mt-0.5 ${isSelected ? 'text-slate-900' : 'text-yellow-400'}">★ ${totalStars}/30</span>
+                `;
+                tabsContainer.appendChild(tabBtn);
+            });
+
+            // 2) 선택된 맵 정보 표시 (곱셈 유형 설명 포함)
+            const currentWorld = WORLDS.find(w => w.id === selectedWorldId) || WORLDS[0];
+            const currentStages = STAGES.filter(s => s.worldId === currentWorld.id);
+            const mapStars = currentStages.reduce((sum, s) => sum + s.stars, 0);
+
+            let multDesc = "구구단 (한자리 수 × 한자리 수)";
+            if (currentWorld.multiplyType === 'double-single') multDesc = "두자리 수 × 한자리 수 곱셈";
+            if (currentWorld.multiplyType === 'double-double') multDesc = "두자리 수 × 두자리 수 곱셈";
+
+            infoContainer.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl sm:text-4xl">${currentWorld.avatar}</span>
+                    <div>
+                        <div class="text-amber-300 font-bold text-lg sm:text-xl">${currentWorld.name}</div>
+                        <div class="text-xs sm:text-sm text-cyan-300">곱셈 유형: ${multDesc}</div>
+                    </div>
+                </div>
+                <div class="px-4 py-1.5 rounded-xl bg-slate-900 border border-yellow-500/50 text-yellow-300 font-bold text-sm sm:text-base">
+                    획득한 별: ⭐ ${mapStars} / 30
+                </div>
+            `;
+
+            // 3) 선택된 맵의 10개 스테이지 카드 렌더링 (1 ~ 10)
+            grid.innerHTML = '';
+            currentStages.forEach(stage => {
+                const starsHtml = [1, 2, 3].map(i =>
+                    `<span class="${i <= stage.stars ? 'text-yellow-400' : 'text-slate-600'}">★</span>`
+                ).join('');
+
+                const card = document.createElement('button');
+                card.type = 'button';
+                card.className = `action-btn p-3 min-h-[115px] rounded-2xl border-2 text-left flex flex-col justify-between gap-1.5 ${
+                    stage.isBoss
+                        ? 'bg-gradient-to-b from-rose-950 to-slate-900 border-rose-400 hover:border-yellow-300'
+                        : 'bg-slate-800/95 border-slate-600 hover:border-amber-400'
+                }`;
+                card.onclick = () => startBattle(stage, false);
+                card.innerHTML = `
+                    <div class="flex items-center justify-between w-full">
+                        <span class="px-2 py-0.5 rounded-lg text-xs font-extrabold ${
+                            stage.isBoss ? 'bg-rose-500 text-white' : 'bg-slate-700 text-amber-300'
+                        }">${stage.id}</span>
+                        <div class="text-sm sm:text-base tracking-tighter">${starsHtml}</div>
+                    </div>
+                    <div class="text-center my-1 text-2xl sm:text-3xl">${stage.avatar}</div>
+                    <div class="text-center w-full">
+                        <div class="text-white font-bold text-xs sm:text-sm truncate">${stage.enemy}</div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ==================== 배틀 시작 및 초기화 ====================
+        function startBattle(stage, isTwoPlayer) {
+            SoundFX.init();
+            gameState.currentStage = stage;
+            gameState.active = true;
+            gameState.turn = 1; // 항상 1P(나) 차례부터 시작
+            gameState.isCharging = false;
+            gameState.wrongCountP1 = 0;
+            gameState.wrongCountP2 = 0;
+
+            gameState.p1 = { x: 0.28, vx: 0, hp: 100, mp: 30, color: '#f97316', hairColor: '#f8fafc', anim: 'idle', animTimer: 0, facing: 1 };
+            gameState.p2 = { x: 0.72, vx: 0, hp: 100, mp: 30, color: isTwoPlayer ? '#38bdf8' : '#ec4899', hairColor: '#fde047', anim: 'idle', animTimer: 0, facing: -1 };
+            gameState.projectiles = [];
+            gameState.particles = [];
+
+            document.getElementById('p1-name').textContent = isTwoPlayer ? '1P 전사' : '나 (1P)';
+            document.getElementById('p2-name').textContent = isTwoPlayer ? '2P 전사' : stage.enemy;
+            document.getElementById('p2-avatar').textContent = isTwoPlayer ? '🥷' : stage.avatar;
+            document.getElementById('battle-stage-badge').textContent = isTwoPlayer ? '2인용 대전 모드' : `STAGE ${stage.id}`;
+
+            showScreen('screen-battle');
+            resizeCanvas();
+            updateHUD();
+            showBanner(isTwoPlayer ? '2인용 배틀 시작! 1P 공격 차례!' : `${stage.enemy} 등장! 나의 공격 차례입니다!`);
+        }
+
+        // ==================== 배틀 시작 및 초기화 ====================
+        function startBattle(stage, isTwoPlayer) {
+            SoundFX.init();
+            gameState.currentStage = stage;
+            gameState.active = true;
+            gameState.turn = 1;
+            gameState.isCharging = false;
+            gameState.wrongCountP1 = 0;
+            gameState.wrongCountP2 = 0;
+
+            gameState.p1 = { x: 0.28, vx: 0, hp: 100, mp: 30, color: '#f97316', hairColor: '#f8fafc', anim: 'idle', animTimer: 0, facing: 1 };
+            gameState.p2 = { x: 0.72, vx: 0, hp: 100, mp: 30, color: isTwoPlayer ? '#38bdf8' : '#ec4899', hairColor: '#fde047', anim: 'idle', animTimer: 0, facing: -1 };
+            gameState.projectiles = [];
+            gameState.particles = [];
+
+            document.getElementById('p1-name').textContent = isTwoPlayer ? '1P 전사' : '나 (1P)';
+            document.getElementById('p2-name').textContent = isTwoPlayer ? '2P 전사' : stage.enemy;
+            document.getElementById('p2-avatar').textContent = isTwoPlayer ? '🥷' : stage.avatar;
+            document.getElementById('battle-stage-badge').textContent = isTwoPlayer ? '2인용 대전 모드' : `STAGE ${stage.id}`;
+
+            showScreen('screen-battle');
+            resizeCanvas();
+            updateHUD();
+            showBanner(isTwoPlayer ? '2인용 배틀 시작! 1P 차례!' : `${stage.enemy} 등장! 배틀 시작!`);
+        }
+
+        function quitBattle() {
+            gameState.active = false;
+            if (gameState.mode === '1P') {
+                showScreen('screen-stage');
+                renderStageSelect();
+            } else {
+                showScreen('screen-title');
+            }
+        }
+
+        function finishBattleToStage() {
+            document.getElementById('modal-result').classList.add('hidden');
+            gameState.active = false;
+            if (gameState.mode === '1P') {
+                selectedWorldId = gameState.currentStage.worldId || 1;
+                showScreen('screen-stage');
+                renderStageSelect();
+            } else {
+                showScreen('screen-title');
+            }
+        }
+
+        // ==================== HUD 및 버튼 활성화 업데이트 ====================
+        function updateHUD() {
+            const p1 = gameState.p1;
+            const p2 = gameState.p2;
+
+            document.getElementById('p1-hp-bar').style.width = `${Math.max(0, p1.hp)}%`;
+            document.getElementById('p1-hp-text').textContent = `${Math.max(0, p1.hp)} / 100`;
+            document.getElementById('p1-mp-bar').style.width = `${Math.min(100, p1.mp)}%`;
+            document.getElementById('p1-mp-text').textContent = `마나: ${Math.floor(p1.mp)} / 100`;
+
+            document.getElementById('p2-hp-bar').style.width = `${Math.max(0, p2.hp)}%`;
+            document.getElementById('p2-hp-text').textContent = `${Math.max(0, p2.hp)} / 100`;
+            document.getElementById('p2-mp-bar').style.width = `${Math.min(100, p2.mp)}%`;
+            document.getElementById('p2-mp-text').textContent = `마나: ${Math.floor(p2.mp)} / 100`;
+
+            const turnBadge = document.getElementById('turn-indicator');
+            const activePlayer = (gameState.mode === '2P' && gameState.turn === 2) ? p2 : p1;
+
+            if (gameState.mode === '2P') {
+                turnBadge.textContent = gameState.turn === 1 ? '1P 공격 차례!' : '2P 공격 차례!';
+                turnBadge.className = gameState.turn === 1
+                    ? 'mt-1 px-3 py-0.5 rounded-full bg-amber-400 text-slate-950 text-xs sm:text-sm font-bold shadow'
+                    : 'mt-1 px-3 py-0.5 rounded-full bg-cyan-400 text-slate-950 text-xs sm:text-sm font-bold shadow';
+            } else {
+                // 1인용 모드: 내 차례와 상대(적) 차례 번갈아 표시
+                if (gameState.turn === 1) {
+                    turnBadge.textContent = '나의 공격 차례!';
+                    turnBadge.className = 'mt-1 px-3 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-xs sm:text-sm font-bold shadow';
+                } else {
+                    turnBadge.textContent = `${gameState.currentStage.enemy}의 반격 차례!`;
+                    turnBadge.className = 'mt-1 px-3 py-0.5 rounded-full bg-rose-500 text-white text-xs sm:text-sm font-bold shadow';
+                }
+            }
+
+            // 내 차례일 때만 공격 버튼 활성화 (1인용 모드에서 적 차례에는 버튼 비활성화)
+            const isMyTurn = (gameState.mode === '2P') || (gameState.turn === 1);
+            const canAct = isMyTurn;
+
+            document.getElementById('btn-special').disabled = !canAct || activePlayer.mp < 40;
+            document.getElementById('btn-ultimate').disabled = !canAct || activePlayer.mp < 80;
+            document.getElementById('btn-normal').disabled = !canAct;
+            document.getElementById('btn-charge').disabled = !canAct;
+        }
+
+        let bannerTimeout = null;
+        function showBanner(text) {
+            const banner = document.getElementById('battle-banner');
+            banner.textContent = text;
+            banner.classList.remove('hidden');
+            if (bannerTimeout) clearTimeout(bannerTimeout);
+            bannerTimeout = setTimeout(() => {
+                banner.classList.add('hidden');
+            }, 1700);
+        }
+
+        // ==================== 기 모으기 (Z 버튼) ====================
+        function startCharging(e) {
+            if (e) e.preventDefault();
+            if (!gameState.active) return;
+            SoundFX.init();
+            gameState.isCharging = true;
+            document.getElementById('btn-charge').classList.add('charge-active');
+        }
+
+        function stopCharging(e) {
+            if (e) e.preventDefault();
+            gameState.isCharging = false;
+            document.getElementById('btn-charge').classList.remove('charge-active');
+        }
+
+        // ==================== 곱셈 퀴즈 로직 ====================
+        function openMathQuiz(skillType) {
+            if (!gameState.active) return;
+            // 1인용 모드에서 적 차례이거나 2인용에서 상대 차례이면 공격 불가
+            if (gameState.mode === '1P' && gameState.turn !== 1) return;
+
+            stopCharging();
+
+            const attacker = (gameState.mode === '2P' && gameState.turn === 2) ? gameState.p2 : gameState.p1;
+
+            if (skillType === 'normal') {
+                quizState.skillType = 'normal';
+                quizState.totalQuestions = 1;
+                quizState.damage = 10;
+                quizState.mpCost = 0;
+                document.getElementById('quiz-skill-badge').textContent = '👊 일반공격 (데미지 10%)';
+            } else if (skillType === 'special') {
+                if (attacker.mp < 40) return;
+                quizState.skillType = 'special';
+                quizState.totalQuestions = 2;
+                quizState.damage = 30;
+                quizState.mpCost = 40;
+                document.getElementById('quiz-skill-badge').textContent = '⚡ 특수스킬 (데미지 30%)';
+            } else if (skillType === 'ultimate') {
+                if (attacker.mp < 80) return;
+                quizState.skillType = 'ultimate';
+                quizState.totalQuestions = 3;
+                quizState.damage = 50;
+                quizState.mpCost = 80;
+                document.getElementById('quiz-skill-badge').textContent = '🔥 필살기 (데미지 50%)';
+            }
+
+            // 마나 소모
+            attacker.mp = Math.max(0, attacker.mp - quizState.mpCost);
+            updateHUD();
+
+            quizState.currentIndex = 1;
+            generateQuestion();
+            document.getElementById('modal-quiz').classList.remove('hidden');
+        }
+
+        function generateQuestion() {
+            document.getElementById('quiz-progress-badge').textContent = `문제 ${quizState.currentIndex} / ${quizState.totalQuestions}`;
+
+            const multType = gameState.currentStage.multiplyType;
+            let a, b;
+
+            if (multType === 'double-double') {
+                // 맵 6: 두자리 수 × 두자리 수 (11~35 × 11~19 등 초등학생이 풀기 좋은 범위)
+                a = Math.floor(Math.random() * 25) + 11;
+                b = Math.floor(Math.random() * 9) + 11;
+            } else if (multType === 'double-single') {
+                // 맵 4, 5: 두자리 수 × 한자리 수 (12~49 × 2~9)
+                a = Math.floor(Math.random() * 38) + 12;
+                b = Math.floor(Math.random() * 8) + 2;
+            } else {
+                // 맵 1, 2, 3: 구구단 (한자리 수 × 한자리 수)
+                const tables = gameState.currentStage.tables;
+                a = tables[Math.floor(Math.random() * tables.length)];
+                b = Math.floor(Math.random() * 9) + 1;
+            }
+
+            const answer = a * b;
+            quizState.currentAnswer = answer;
+
+            document.getElementById('quiz-question').textContent = `${a} × ${b} = ?`;
+
+            // 오답 보기 3개 생성
+            const optionsSet = new Set([answer]);
+            while (optionsSet.size < 4) {
+                const offset = (Math.floor(Math.random() * 7) - 3) * (Math.random() > 0.5 ? 1 : (a > 20 ? 5 : 2));
+                const candidate = answer + offset;
+                if (candidate > 0 && candidate !== answer) {
+                    optionsSet.add(candidate);
+                } else {
+                    optionsSet.add(answer + optionsSet.size * 3 + 2);
+                }
+            }
+
+            const options = Array.from(optionsSet).sort(() => Math.random() - 0.5);
+            const optionsDiv = document.getElementById('quiz-options');
+            optionsDiv.innerHTML = '';
+
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn py-4 rounded-2xl bg-slate-700 hover:bg-amber-500 hover:text-slate-950 border-2 border-slate-500 text-2xl sm:text-3xl font-bold text-white transition-colors';
+                btn.textContent = opt;
+                btn.onclick = () => submitAnswer(opt);
+                optionsDiv.appendChild(btn);
+            });
+        }
+
+        function submitAnswer(selected) {
+            const isP1Turn = !(gameState.mode === '2P' && gameState.turn === 2);
+
+            if (selected === quizState.currentAnswer) {
+                SoundFX.playCorrect();
+                if (quizState.currentIndex < quizState.totalQuestions) {
+                    // 다음 문제 출제
+                    quizState.currentIndex++;
+                    generateQuestion();
+                } else {
+                    // 모든 문제 정답 -> 공격 성공!
+                    document.getElementById('modal-quiz').classList.add('hidden');
+                    executeAttack(isP1Turn ? 1 : 2, quizState.damage);
+                }
+            } else {
+                // 문제 오답 -> 공격 실패 & 상대방이 무조건 20% 반격!
+                SoundFX.playWrong();
+                document.getElementById('modal-quiz').classList.add('hidden');
+                if (isP1Turn) gameState.wrongCountP1++;
+                else gameState.wrongCountP2++;
+
+                showBanner('❌ 오답! 공격 실패! 상대방의 20% 반격!');
+                setTimeout(() => {
+                    executeAttack(isP1Turn ? 2 : 1, 20, true);
+                }, 450);
+            }
+        }
+
+        // ==================== 공격 애니메이션 및 데미지 처리 ====================
+        function executeAttack(attackerNum, damage, isCounter = false) {
+            if (!gameState.active) return;
+
+            const attacker = attackerNum === 1 ? gameState.p1 : gameState.p2;
+            const defender = attackerNum === 1 ? gameState.p2 : gameState.p1;
+
+            attacker.anim = 'attack';
+            attacker.animTimer = 25;
+
+            // 기 파동 투사체 발사
+            const beamColor = damage >= 50 ? '#f43f5e' : (damage >= 30 ? '#38bdf8' : (isCounter ? '#a855f7' : '#facc15'));
+            const beamSize = damage >= 50 ? 42 : (damage >= 30 ? 28 : 18);
+
+            gameState.projectiles.push({
+                x: attacker.x,
+                targetX: defender.x,
+                dir: attackerNum === 1 ? 1 : -1,
+                speed: 0.035,
+                color: beamColor,
+                size: beamSize,
+                onHit: () => {
+                    SoundFX.playHit(damage);
+                    defender.hp = Math.max(0, defender.hp - damage);
+                    defender.anim = 'hurt';
+                    defender.animTimer = 22;
+                    gameState.shakeTimer = damage >= 30 ? 18 : 10;
+
+                    spawnHitParticles(defender.x, beamColor, damage >= 30 ? 35 : 18);
+                    if (!isCounter) {
+                        showBanner(`💥 명중! ${damage}% 피해!`);
+                    }
+                    updateHUD();
+
+                    // 승패 판정
+                    if (defender.hp <= 0) {
+                        setTimeout(() => handleBattleEnd(attackerNum), 600);
+                    } else {
+                        // 턴 교대 규칙 (나 공격 -> 적 반격/공격 -> 나 공격)
+                        if (gameState.mode === '2P') {
+                            gameState.turn = gameState.turn === 1 ? 2 : 1;
+                        } else {
+                            // 1인용 모드: 내가 공격했으면(attackerNum === 1) 적의 차례가 되어 자동으로 20% 공격을 실행!
+                            if (attackerNum === 1) {
+                                gameState.turn = 2; // 적 차례
+                                updateHUD();
+                                showBanner(`⚠️ ${gameState.currentStage.enemy}의 반격 차례!`);
+                                setTimeout(() => {
+                                    if (gameState.active) {
+                                        // 적이 나를 공격 (무조건 20% 데미지)
+                                        executeAttack(2, 20, true);
+                                    }
+                                }, 1200);
+                                return;
+                            } else {
+                                // 적의 반격이 끝났으면 다시 내 차례로 복귀
+                                gameState.turn = 1;
+                            }
+                        }
+                        updateHUD();
+                    }
+                }
+            });
+        }
+
+        function spawnHitParticles(normX, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 8;
+                gameState.particles.push({
+                    normX: normX,
+                    yOffset: -55 + (Math.random() * 40 - 20),
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed,
+                    color: i % 2 === 0 ? color : '#ffffff',
+                    life: 25 + Math.random() * 15,
+                    size: 3 + Math.random() * 5
+                });
+            }
+        }
+
+        // ==================== 승리/패배 및 별(1~3개) 판정 ====================
+        function handleBattleEnd(winnerNum) {
+            gameState.active = false;
+            const modal = document.getElementById('modal-result');
+            const titleEl = document.getElementById('result-title');
+            const subEl = document.getElementById('result-subtitle');
+            const starsEl = document.getElementById('result-stars');
+            const statsEl = document.getElementById('result-stats');
+
+            if (gameState.mode === '1P' && winnerNum === 2) {
+                // 1인용 패배
+                titleEl.textContent = '아쉬워요! 패배...';
+                titleEl.className = 'title-font text-4xl sm:text-5xl text-rose-400 drop-shadow mb-2';
+                subEl.textContent = '구구단을 다시 복습하고 도전해 보세요!';
+                starsEl.innerHTML = '<span class="opacity-30">⭐</span><span class="opacity-30">⭐</span><span class="opacity-30">⭐</span>';
+                statsEl.textContent = `틀린 문제: ${gameState.wrongCountP1}개`;
+            } else {
+                // 승리! ("축하합니다!" 메시지 + 별 1~3개 계산)
+                SoundFX.playWin();
+                const wrongs = (gameState.mode === '2P' && winnerNum === 2) ? gameState.wrongCountP2 : gameState.wrongCountP1;
+
+                // 별 규칙: 0개 틀리면 별 3개, 1개 틀리면 별 2개, 2개 이상 틀리면 별 1개
+                let earnedStars = 3;
+                if (wrongs === 1) earnedStars = 2;
+                else if (wrongs >= 2) earnedStars = 1;
+
+                if (gameState.mode === '1P') {
+                    gameState.currentStage.stars = Math.max(gameState.currentStage.stars, earnedStars);
+                }
+
+                titleEl.textContent = '축하합니다!';
+                titleEl.className = 'title-font text-4xl sm:text-5xl text-yellow-300 drop-shadow mb-2';
+                subEl.textContent = gameState.mode === '2P'
+                    ? `${winnerNum}P 전사가 승리했습니다!`
+                    : `${gameState.currentStage.name} 클리어!`;
+
+                starsEl.innerHTML = [1, 2, 3].map(i =>
+                    `<span class="${i <= earnedStars ? 'scale-110 drop-shadow-[0_0_12px_rgba(250,204,21,0.9)]' : 'opacity-25 grayscale'}">⭐</span>`
+                ).join('');
+
+                const comment = earnedStars === 3 ? '완벽해요! 별 3개!' : (earnedStars === 2 ? '아깝게 1개 틀렸어요! 별 2개!' : '끝까지 승리했어요! 별 1개!');
+                statsEl.textContent = `틀린 문제: ${wrongs}개 (${comment})`;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        // ==================== 가상 조이스틱 & 키보드 제어 ====================
+        const joystickZone = document.getElementById('joystick-zone');
+        const joystickKnob = document.getElementById('joystick-knob');
+        let joyActive = false;
+        let joyDir = 0; // -1: 왼쪽, 0: 정지, 1: 오른쪽
+
+        function handleJoystickMove(clientX) {
+            const rect = joystickZone.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const maxDist = rect.width * 0.32;
+            let dx = clientX - centerX;
+            dx = Math.max(-maxDist, Math.min(maxDist, dx));
+
+            joystickKnob.style.transform = `translateX(${dx}px)`;
+            if (dx < -10) joyDir = -1;
+            else if (dx > 10) joyDir = 1;
+            else joyDir = 0;
+        }
+
+        function resetJoystick() {
+            joyActive = false;
+            joyDir = 0;
+            joystickKnob.style.transform = `translateX(0px)`;
+        }
+
+        joystickZone.addEventListener('mousedown', (e) => { joyActive = true; handleJoystickMove(e.clientX); });
+        window.addEventListener('mousemove', (e) => { if (joyActive) handleJoystickMove(e.clientX); });
+        window.addEventListener('mouseup', () => { if (joyActive) resetJoystick(); });
+
+        joystickZone.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            joyActive = true;
+            handleJoystickMove(e.touches[0].clientX);
+        }, { passive: false });
+        joystickZone.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (joyActive) handleJoystickMove(e.touches[0].clientX);
+        }, { passive: false });
+        joystickZone.addEventListener('touchend', resetJoystick);
+
+        // 키보드 화살표 및 Z 키 지원
+        const keys = {};
+        window.addEventListener('keydown', (e) => {
+            keys[e.key.toLowerCase()] = true;
+            if (e.key.toLowerCase() === 'z' && !e.repeat) {
+                startCharging();
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+            keys[e.key.toLowerCase()] = false;
+            if (e.key.toLowerCase() === 'z') {
+                stopCharging();
+            }
+        });
+
+        // ==================== 스틱맨 격투 애니메이션 캔버스 렌더링 ====================
+        const canvas = document.getElementById('battle-canvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        let lastChargeSound = 0;
+
+        function updateSimulation(timestamp) {
+            if (!gameState.active) return;
+
+            const activePlayer = (gameState.mode === '2P' && gameState.turn === 2) ? gameState.p2 : gameState.p1;
+
+            // 좌우 이동 처리 (조이스틱 + 키보드)
+            let moveX = joyDir;
+            if (keys['arrowleft'] || keys['a']) moveX = -1;
+            if (keys['arrowright'] || keys['d']) moveX = 1;
+
+            if (moveX !== 0) {
+                activePlayer.x += moveX * 0.0065;
+                activePlayer.x = Math.max(0.12, Math.min(0.88, activePlayer.x));
+                activePlayer.facing = moveX;
+            } else {
+                // 멈춰있을 때는 상대를 바라봄
+                gameState.p1.facing = gameState.p1.x <= gameState.p2.x ? 1 : -1;
+                gameState.p2.facing = gameState.p2.x <= gameState.p1.x ? 1 : -1;
+            }
+
+            // Z 버튼 기 모으기 (마나 충전)
+            if (gameState.isCharging && activePlayer.mp < 100) {
+                activePlayer.mp = Math.min(100, activePlayer.mp + 0.45);
+                updateHUD();
+                if (timestamp - lastChargeSound > 180) {
+                    SoundFX.playCharge();
+                    lastChargeSound = timestamp;
+                }
+            }
+
+            // 애니메이션 타이머 감소
+            [gameState.p1, gameState.p2].forEach(p => {
+                if (p.animTimer > 0) {
+                    p.animTimer--;
+                    if (p.animTimer === 0) p.anim = 'idle';
+                }
+            });
+
+            // 기 파동 투사체 이동
+            for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
+                const proj = gameState.projectiles[i];
+                proj.x += proj.dir * proj.speed;
+                if ((proj.dir === 1 && proj.x >= proj.targetX) || (proj.dir === -1 && proj.x <= proj.targetX)) {
+                    proj.onHit();
+                    gameState.projectiles.splice(i, 1);
+                }
+            }
+
+            // 타격 파티클 업데이트
+            for (let i = gameState.particles.length - 1; i >= 0; i--) {
+                const pt = gameState.particles[i];
+                pt.normX += pt.vx / canvas.width;
+                pt.yOffset += pt.vy;
+                pt.life--;
+                if (pt.life <= 0) gameState.particles.splice(i, 1);
+            }
+
+            if (gameState.shakeTimer > 0) gameState.shakeTimer--;
+        }
+
+        function drawStickFighter(player, groundY, isChargingMe, time) {
+            const px = player.x * canvas.width;
+            const bounce = Math.sin(time * 0.008) * 4;
+            const hurtOffset = player.anim === 'hurt' ? (Math.random() * 14 - 7) : 0;
+            const attackForward = player.anim === 'attack' ? player.facing * 24 : 0;
+
+            const x = px + hurtOffset + attackForward;
+            const y = groundY;
+
+            ctx.save();
+
+            // 기 모으기(Z 버튼) 황금 오라 이펙트
+            if (isChargingMe) {
+                const auraRadius = 58 + Math.sin(time * 0.03) * 10;
+                const grad = ctx.createRadialGradient(x, y - 55, 10, x, y - 55, auraRadius);
+                grad.addColorStop(0, 'rgba(253, 224, 71, 0.75)');
+                grad.addColorStop(0.6, 'rgba(56, 189, 248, 0.35)');
+                grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(x, y - 55, auraRadius, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 바닥 그림자
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 26, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.lineWidth = 7;
+
+            // 다리 (무술 자세)
+            ctx.strokeStyle = player.color;
+            ctx.beginPath();
+            ctx.moveTo(x, y - 42 + bounce);
+            ctx.lineTo(x - 16 * player.facing, y - 20);
+            ctx.lineTo(x - 22 * player.facing, y);
+            ctx.moveTo(x, y - 42 + bounce);
+            ctx.lineTo(x + 16 * player.facing, y - 18);
+            ctx.lineTo(x + 22 * player.facing, y);
+            ctx.stroke();
+
+            // 몸통
+            ctx.strokeStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.moveTo(x, y - 42 + bounce);
+            ctx.lineTo(x, y - 78 + bounce);
+            ctx.stroke();
+
+            // 허리띠
+            ctx.strokeStyle = '#2563eb';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.moveTo(x - 7, y - 44 + bounce);
+            ctx.lineTo(x + 7, y - 44 + bounce);
+            ctx.stroke();
+
+            // 팔 (공격 시 펀치 뻗기)
+            ctx.strokeStyle = '#fde68a';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            if (player.anim === 'attack') {
+                ctx.moveTo(x, y - 72 + bounce);
+                ctx.lineTo(x + 36 * player.facing, y - 72 + bounce);
+            } else {
+                ctx.moveTo(x, y - 72 + bounce);
+                ctx.lineTo(x + 16 * player.facing, y - 62 + bounce);
+                ctx.lineTo(x + 22 * player.facing, y - 74 + bounce);
+            }
+            ctx.stroke();
+
+            // 머리
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath();
+            ctx.arc(x, y - 92 + bounce, 13, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 뾰족한 초사이어인 스타일 헤어
+            ctx.fillStyle = player.hairColor;
+            ctx.beginPath();
+            ctx.moveTo(x - 14, y - 96 + bounce);
+            ctx.lineTo(x - 18, y - 114 + bounce);
+            ctx.lineTo(x - 5, y - 105 + bounce);
+            ctx.lineTo(x, y - 122 + bounce);
+            ctx.lineTo(x + 6, y - 105 + bounce);
+            ctx.lineTo(x + 18, y - 114 + bounce);
+            ctx.lineTo(x + 14, y - 96 + bounce);
+            ctx.closePath();
+            ctx.fill();
+
+            // 눈
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(x + 5 * player.facing, y - 92 + bounce, 2.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function renderBattle(time) {
+            const w = canvas.width;
+            const h = canvas.height;
+            const groundY = h * 0.78;
+
+            ctx.save();
+
+            // 화면 흔들림 효과
+            if (gameState.shakeTimer > 0) {
+                const sx = (Math.random() - 0.5) * 14;
+                const sy = (Math.random() - 0.5) * 14;
+                ctx.translate(sx, sy);
+            }
+
+            // 스테이지별 배경 그라데이션
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, h);
+            bgGrad.addColorStop(0, gameState.currentStage.bgTop);
+            bgGrad.addColorStop(0.7, gameState.currentStage.bgBottom);
+            bgGrad.addColorStop(1, '#090d16');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, w, h);
+
+            // 배경 집중선 효과
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 16; i++) {
+                const angle = (i / 16) * Math.PI * 2 + time * 0.0002;
+                ctx.beginPath();
+                ctx.moveTo(w * 0.5, h * 0.55);
+                ctx.lineTo(w * 0.5 + Math.cos(angle) * w, h * 0.55 + Math.sin(angle) * h);
+                ctx.stroke();
+            }
+
+            // 경기장 바닥 지평선
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            ctx.fillRect(0, groundY, w, h - groundY);
+            ctx.strokeStyle = '#fbbf24';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(w, groundY);
+            ctx.stroke();
+
+            // 두 캐릭터 그리기
+            const p1Charging = gameState.isCharging && !(gameState.mode === '2P' && gameState.turn === 2);
+            const p2Charging = gameState.isCharging && (gameState.mode === '2P' && gameState.turn === 2);
+
+            drawStickFighter(gameState.p1, groundY, p1Charging, time);
+            drawStickFighter(gameState.p2, groundY, p2Charging, time);
+
+            // 기 파동 투사체 그리기
+            gameState.projectiles.forEach(proj => {
+                const bx = proj.x * w;
+                const by = groundY - 68;
+                const grad = ctx.createRadialGradient(bx, by, 4, bx, by, proj.size * 1.8);
+                grad.addColorStop(0, '#ffffff');
+                grad.addColorStop(0.4, proj.color);
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(bx, by, proj.size * 1.8, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // 타격 파티클 그리기
+            gameState.particles.forEach(pt => {
+                ctx.fillStyle = pt.color;
+                ctx.beginPath();
+                ctx.arc(pt.normX * w, groundY + pt.yOffset, pt.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            ctx.restore();
+        }
+
+        function gameLoop(timestamp) {
+            updateSimulation(timestamp);
+            if (!document.getElementById('screen-battle').classList.contains('hidden')) {
+                renderBattle(timestamp);
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 윈도우 로드 시 애니메이션 루프 시작 및 스테이지 목록 초기 렌더링
+        window.onload = function () {
+            renderStageSelect();
+            resizeCanvas();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
